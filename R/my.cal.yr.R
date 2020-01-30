@@ -1,0 +1,45 @@
+#'  my.cal.yr
+#'
+#' @section Definiciones
+#'  Transforma una fecha (objeto de clase Date) en un valor de años
+#'  decimal.  tiene en cuenta si es un año bisiesto. Correcion de los
+#'  años seculares (no bisiestos) menos los multiplos de 400.  Puede
+#'  crea pequeño desplazamientos de los aniversarios en años bisiestos
+#'  (un dia antes despues del 29 de febrero). Este pequeño
+#'  incoveniente permite trabaja como si las longitud de los años
+#'  fueran iguales idependientemente de las irrregularidades
+#'  introducidas por los años bisiestos en el calendario gregoriano. Y
+#'  permite calculos aritmetico sencillos con edad y periodo sobre un
+#'  diagrama de Lexis. Otros sistemas de trandformacion a decimales
+#'  como Epi::cal.yr usan una formulamas simple,
+#'  (as.numeric(x)/365.25 + 1970), tienen el inconveniente de
+#'  producir edades cumplidas aproximadas
+#'
+#'
+#'   @param fechas vector con fechas (classe Date) que convertir en
+#'     años
+#'
+#'   @param precision El metodo de calculo de la fecha decimal
+#'     presupone dividido el años en granulos regulares (anchura
+#'     decimal dada por este pametro). El punto de referencia de un
+#'     granulo dado es su estremo izquierdo. Similar a edad cumplida y
+#'     año en curso.
+#'
+#'   @export
+#'
+#'   @return   valor númerico en años decimales (3 decimales de precisión)
+#'
+
+my.cal.yr <- function(fechas, precision = 3 ) {
+  yy  <- data.table::year(fechas)
+  lead.year <-  ifelse(yy %% 4 == 0,
+                ifelse(!(yy %% 400 == 0) & (yy %% 100 == 0),F,T),F)
+  w.years <- ifelse(lead.year,366,365)
+  # Tiempo comienzo a 00:00 (dia cumplido). Tiempo posicionado en
+  # extremo izquiedo del granuloro
+  yy <-  data.table::year(fechas) + data.table::yday(fechas)/
+      w.years - 1/w.years  # posicionado al comienzo del dia.
+  yy <- floor(10^precision*yy)/10^precision
+  return ( yy )
+}
+

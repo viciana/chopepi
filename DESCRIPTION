@@ -1,0 +1,24 @@
+Package: chopepi
+Type: Package
+Title: Paquete para trocear episodios en varias escalas temporales
+Version: 0.1.0
+Authors@R: c(
+    person("Viciana Fernández", "Francisco José", 
+            email = "viciana@us.es", role = "cre"))
+Maintainer: Francisco Viciana <viciana@us.es>
+Description: Paquete para trocear episodios segun varias escalas temporales 
+    "chop" y posteriormente combinarlos "combine2c". "chop" y "combine2c"
+    almacenan subepisodios como una lista asociada a la clave identificadora
+    de episodio "kid". "melpEpi" pasa este pseudo-formato ancho a un
+    formato corto (cada subepisodios, generado  es una nueva fila).
+    Por ultimo la función "addCXst" añade los estados y transiones asociado
+    a cada subepisodios recuperado los Current y Exit states de la tabla de
+    episodios original.
+License:  GPL-2
+Encoding: UTF-8
+Depends: R (>= 3.1.0)
+LazyData: true
+Imports: data.table  (>= 1.1)
+Suggests:
+    Epi
+RoxygenNote: 7.0.2
