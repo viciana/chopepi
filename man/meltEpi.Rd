@@ -25,24 +25,31 @@ un data.table donde cada registro de episodio se ha divido en tamtos
         \code{combine2c}
 }
 \description{
-Toma una tabla de episodios  (durations) preprocesado por \code{chop} y que
-cada fila contiene una lista con el vector de subepisodio troceado por una o
-mas escalas temporales, y genera un registro individual por cada uno de los
-subepisodio contenidos en el episodio.
+Toma como entrada una tabla de episodios, que ha sido preprocesado por
+las funcion \code{chopepi::chop} conteniendo la varible  "durations.<dim.tmp>",
+el tiempo de comienzo del episodios, y una lista con el vector de subepisodio troceado
+por una o mas escalas temporales. Tras su proceso se genera una nueva tabla
+con un registro individual con cada uno de los subepisodio contenidos en el
+episodio madre.
 }
 \examples{
 
 \donttest{
-## Trocea una tabla de episodios en 3 escalas termporales distintas
-  start.times <- c(16,21,32)
-  durations <- c(12.5,19.4, 7.3)      ; breaks <- seq(10,50, by=5)
-  start.times2 <- c(1997,2005.2,2007) ; breaks2 <- seq(1990,2020, by=5)
-  chop (start.times,  durations,  breaks,   timedim = 'edad' )   -> epi.seq1
-  chop (start.times2, durations,  breaks2 , timedim = 'periodo') -> epi.seq2
+epi.original <- data.table::data.table(
+ kid = 1:3 ,
+ start.times  = c(16,21,32)     ,
+ durations  = c(12.5,19.4, 7.3) ,
+ Cst = c(0,0,0),
+ Xst = c(1,1,1)
+ )
 
-## Combina las dos escalas en dos pasos ...
-  combine2c (epi.seq1,epi.seq2) -> epi.1y2
-  meltEpi(epi.1y2) -> epi.melt
+chop (start.times =  start.times,
+     durations   = durations,
+     breaks = seq(10,50, by=5),
+     timedim = 'edad', data = epi.original)  -> epi.seq
+
+meltEpi(epi.seq) -> epi.sub
+epi.sub
 }
 
 }

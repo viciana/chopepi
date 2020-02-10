@@ -13,7 +13,7 @@
 #' @docType package
 #' @name chopepi
 #' @import data.table
-#' @importFrom utils head tail
+#' @importFrom data.table  between  year yday
 
 
 

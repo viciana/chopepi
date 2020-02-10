@@ -12,13 +12,14 @@ Description: Paquete para trocear episodios segun varias escalas temporales
     de episodio "kid". "melpEpi" pasa este pseudo-formato ancho a un
     formato corto (cada subepisodios, generado  es una nueva fila).
     Por ultimo la función "addCXst" añade los estados y transiones asociado
-    a cada subepisodios recuperado los Current y Exit states de la tabla de
+    a cada subepisodios recuperado los "Current" y "Exit" states de la tabla de
     episodios original.
-License:  GPL-2
+License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 3.1.0)
 LazyData: true
 Imports: data.table  (>= 1.1)
 Suggests:
-    Epi
-RoxygenNote: 7.0.2
+    Epi,
+    survival
+RoxygenNote: 7.0.2.9000

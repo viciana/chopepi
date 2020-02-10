@@ -1,0 +1,393 @@
+#+TITLE:      chopepi
+#+AUTHOR:     Francisco Viciana
+#+EMAIL:      viciana  AT us DOT es
+#+LANGUAGE:   es
+#+OPTIONS: ^:nil
+#+BABEL: :session *R* :cache yes :results output graphics :exports both :tangle yes 
+
+* chopepi: Trocear episodios en multiples escalas de tiempo
+
+** Motivación 
+
+En estudios longitudinales de seguimiento es habitual enfrentarse al
+problema de tener que analizar efectos temporales en *múltiples
+escalas de tiempo*, tales como la edad, el tiempo calendario o la
+duración desde un evento anterior. En situaciones donde no sea
+asumible la linealidad de los efectos temporales o cuando se precise
+estudiar interrelaciones suele ser preciso discretizar los tiempos de
+exposición de las escalas temporales. Esta tarea suele implicar
+relativamente costosas manipulaciones del "dataset original" de
+acuerdo a prepararlo para las especificaciones del modelo que queremos
+ajustar.
+
+Los *dataset* crudos habitualmente están compuesto por secuencias
+ordenadas de *episodios* independientes. Cada individuo en seguimiento
+tendrá una secuencia de uno o más episodios, que recoge su trayectoria
+en el *espacio de estados* que hemos definido durante la *ventana de
+observación* que estemos analizando.
+
+Los episodios, tienen fecha de comienzo y terminación y su correspondiente
+estado al comienzo (*Current Status: Cst*) y a su finalización (*Exit
+Status: Xst*). En la siguiente tabla se muestra un ejemplo de un
+sencillo "dataset", con dos escalas de tiempo explicitas: tiempo
+calendario y edad. En ella se representa las biografías reproductivas de
+tres individuos ("ikey") resumida en 7 episodios de paridad ("ikey" +
+"seq.epi" ~ "kepi"). Donde "date.star" es la fecha calendario del
+evento, "age.entry" la edad exacta en años decimales al comienzo del
+episodio; "span.years" y "span.days" son las duracione del episodio en
+unidades dias y años; "Cst.par" la paridad al comienzo del episodio y
+"Xst.par" la paridad al terminar el episodio. En esta tabla hay
+redundancia, ya que varias de las variable pueden ser derivadas, por
+manipulación o transformaciones de alguna de las otras variables y no
+seria necesarias en una tabla de datos optimizada. Por motivos
+de claridad se prefiere mantenerlas.
+
+#+CAPTION: Original data
+#+NAME: tbl:original
+| ikey | seq.epi | kepi | date.start | age.entry | span.years | span.days | Cst.par | Xst.par |
+|------+---------+------+------------+-----------+------------+-----------+---------+---------|
+|    1 |       1 |  101 | 1958-03-13 |     0.000 |     23.169 |      8463 |       0 |       1 |
+|    1 |       2 |  102 | 1981-05-14 |    23.169 |      3.635 |      1328 |       1 |       1 |
+|    2 |       1 |  201 | 1955-07-10 |     0.000 |     21.079 |      7699 |       0 |       1 |
+|    2 |       2 |  202 | 1976-08-07 |    21.079 |      4.808 |      1757 |       1 |       2 |
+|    2 |       3 |  203 | 1981-05-30 |    25.887 |      3.591 |      1312 |       2 |       3 |
+|    3 |       1 |  301 | 1960-02-29 |     0.000 |     18.997 |      6939 |       0 |       1 |
+|    3 |       2 |  302 | 1979-02-28 |    18.997 |      5.841 |      2134 |       1 |       1 |
+
+
+Una de las manipulaciones habituales que hay que enfrentar al analizar
+datos longitudinales es el particionado (también denominados
+discretización o "split") de las escalas de tiempo a analizar. Por
+ejemplo si queremos estudiar efectos no lineales de la edad sobre la
+ampliación de la paridad, podríamos discretizar la variable edad, en
+agrupaciones quinquenales, para comprobar los distintos efectos en
+intensidad de fecundidad en cada uno de los grupo de edad. Para ello
+seria preciso transformar la tabla anterior en otra donde cada
+episodios de paridad (sin hijos, con un hijo, ..), se dividirá en
+varios sub-episodios de acuerdo al tramo de edad de exposición en cada
+intervalo de exposición por grupo de edad. En la siguiente tabla, se
+muestra el resultado de particionar la escala de tiempo edad en grupos
+de edad.
+
+
+#+CAPTION: Split by age
+#+NAME: tbl:Split.age
+| kid |    age | duration | band.age | Cst | Xst |
+|-----+--------+----------+----------+-----+-----|
+| 101 |  0.000 |   15.000 | [0,15)   |   0 |   0 |
+| 101 | 15.000 |    5.000 | [15,20)  |   0 |   0 |
+| 101 | 20.000 |    3.169 | [20,25)  |   0 |   1 |
+| 102 | 23.169 |    1.831 | [20,25)  |   1 |   1 |
+| 102 | 25.000 |    1.804 | [25,30)  |   1 |   1 |
+| 201 |  0.000 |   15.000 | [0,15)   |   0 |   0 |
+| 201 | 15.000 |    5.000 | [15,20)  |   0 |   0 |
+| 201 | 20.000 |    1.079 | [20,25)  |   0 |   1 |
+| 202 | 21.079 |    3.921 | [20,25)  |   1 |   1 |
+| 202 | 25.000 |    0.887 | [25,30)  |   1 |   2 |
+| 203 | 25.887 |    3.591 | [25,30)  |   2 |   3 |
+| 301 |  0.000 |   15.000 | [0,15)   |   0 |   0 |
+| 301 | 15.000 |    3.997 | [15,20)  |   0 |   1 |
+| 302 | 18.997 |    1.003 | [15,20)  |   1 |   1 |
+| 302 | 20.000 |    4.838 | [20,25)  |   1 |   1 |
+
+
+Igual que subdividimos los episodio en la escala de edad, podríamos
+subdividirlos tambien en la escala de tiempo calendario. particionado
+que  quedaría de esta manera:
+
+#+CAPTION: Split by period
+#+NAME: tbl:Split.period
+| kid |   period | duration | band.period | Cst | Xst |
+|-----+----------+----------+-------------+-----+-----|
+| 101 | 1958.194 |   16.806 | [1950,1975) |   0 |   0 |
+| 101 | 1975.000 |    5.000 | [1975,1980) |   0 |   0 |
+| 101 | 1980.000 |    1.363 | [1980,1985) |   0 |   1 |
+| 102 | 1981.364 |    3.635 | [1980,1985) |   1 |   1 |
+| 201 | 1955.520 |   19.480 | [1950,1975) |   0 |   0 |
+| 201 | 1975.000 |    1.599 | [1975,1980) |   0 |   1 |
+| 202 | 1976.598 |    3.402 | [1975,1980) |   1 |   1 |
+| 202 | 1980.000 |    1.406 | [1980,1985) |   1 |   2 |
+| 203 | 1981.408 |    3.591 | [1980,1985) |   2 |   3 |
+| 301 | 1960.161 |   14.839 | [1950,1975) |   0 |   0 |
+| 301 | 1975.000 |    4.158 | [1975,1980) |   0 |   1 |
+| 302 | 1979.158 |    0.842 | [1975,1980) |   1 |   1 |
+| 302 | 1980.000 |    4.999 | [1980,1985) |   1 |   1 |
+
+
+Es posible combinar esta dos particiones en dos escalas temporales
+distinta, para obtener una sola partición multi-escala, tal como se
+muestra en la siguiente tabla:
+
+#+CAPTION: Split by age and period
+#+NAME:   tbl:Split.age.period
+| kid |    age |   period | duration | band.age | band.period | Cst | Xst |
+|-----+--------+----------+----------+----------+-------------+-----+-----|
+| 101 |  0.000 | 1958.194 |   15.000 | [0,15)   | [1950,1975) |   0 |   0 |
+| 101 | 15.000 | 1973.194 |    1.806 | [15,20)  | [1950,1975) |   0 |   0 |
+| 101 | 16.806 | 1975.000 |    3.194 | [15,20)  | [1975,1980) |   0 |   0 |
+| 101 | 20.000 | 1978.194 |    1.806 | [20,25)  | [1975,1980) |   0 |   0 |
+| 101 | 21.806 | 1980.000 |    1.363 | [20,25)  | [1980,1985) |   0 |   1 |
+| 102 | 23.169 | 1981.364 |    1.831 | [20,25)  | [1980,1985) |   1 |   1 |
+| 102 | 25.000 | 1983.195 |    1.804 | [25,30)  | [1980,1985) |   1 |   1 |
+|  .. |        |          |          |          |             |     |     |
+| 301 |  0.000 | 1960.161 |   14.839 | [0,15)   | [1950,1975) |   0 |   0 |
+| 301 | 14.839 | 1975.000 |    0.161 | [0,15)   | [1975,1980) |   0 |   0 |
+| 301 | 15.000 | 1975.161 |    3.997 | [15,20)  | [1975,1980) |   0 |   1 |
+| 302 | 18.997 | 1979.158 |    0.842 | [15,20)  | [1975,1980) |   1 |   1 |
+| 302 | 19.839 | 1980.000 |    0.161 | [15,20)  | [1980,1985) |   1 |   1 |
+| 302 | 20.000 | 1980.161 |    4.838 | [20,25)  | [1980,1985) |   1 |   1 |
+
+** Herramientas  para el particionado de episodios 
+
+Varios paquetes de [[https://cran.r-project.org/web/views/Survival.html][R empleados en el análisis de supervivencia]] tienen
+funciones especificamente diseñadas para realizar el particionado de
+los episodios en una dimesiónm temporal. Algunos de estas funciones
+son, por ejemplom [[https://www.rdocumentation.org/packages/survival/versions/3.1-8/topics/survSplit][survival::SurvSplit]], [[https://rdrr.io/cran/relsurv/man/survsplit.html][relsurv::survsplit]] o
+[[https://www.rdocumentation.org/packages/Epi/versions/2.40/topics/splitLexis][Epi::splitLexis]]. Todas ellas hacen el particionado sobre una sola
+escalan temporal, sin embargo aplicando sucesivamente estas funciones sobre
+los sub-episodios resultado de ls partición con anterioridad, es posible
+generar particiones en múltiples escalas temporales. Estas funciones
+son sencillas de utilizar y eficientes cuando se trabaja con un número
+no excesivamente grande de episodios y se dispone de suficientes
+recursos de memoria RAM.
+
+Desafortunadamente cuando el número de episodios que hay que
+particionar crece, acercándose peligrosamente a los recurso de memoria
+RAM del equipo, el rendimiento de estas funciones es pobre. Hay que
+tener en cuenta que el crecimiento del número de episodio por encima
+del óptimo, puede ocurrir incluso trabajando con tabla de episodios de
+moderado tamaño, pero sobre las que precisemos realizar particionar en
+múltiples escalas de tiempo (edades, tiempo calendario, duraciones
+desde un episodio anterior ...)
+
+El paquete *chopepi* que estamos desarrollando pretende mejora el
+rendimiento de estos procesos, cuando no enfrentamos a tablas de
+episodios de medio o gran tamaño. Para conseguir esta mejora aplicamos
+dos estrategias: (1) por un lado usa objetos de tipo /data.table/ para
+procesar los episodios, más rápidamente y eficientemente que con las
+habituales tablas del tipo data.frame; y por otro (2) los
+particionados en una escala temporal son pre-tratado en forma de
+listas en lugar de tabla de sup-episodios lo cual es más sencillo y
+rapido de generar y menos oneroso en cuanto a uso de la memoria de
+trabajo.
+
+La primera estrategia, trabajar con objetos del tipo
+/data.table/, resulta mucho mas eficiente, en lugar de los
+tradicionales /data.frame/ y sus derivados (Lexis, tibble ...), en
+cuanto al uso de memoria RAM y velocidad de proceso, cuando se procesa
+objeto de medio y gran tamaño. Si bien el uso del direccionamiento por
+referencia de data.table crear algo de confusión en usuarios
+poco habituados a trabajar con ello,  este inconvenientes es
+rápidamente soluciónale, en cuanto se va adquiriendo cierta
+experiencia en su manejo.
+
+Esta misma estrategia de, usar /data.tabla/ es empleada por el paquete
+[[https://github.com/WetRobot/popEpi][popEpi]] para mejorar el rendimiento de procesar los objetos del tipo
+[[https://rdrr.io/cran/Epi/man/Lexis.html][Lexis]] definidos que define el paquete [[https://rdrr.io/cran/Epi/][Epi de Bendix Carstensen]] como
+data.frame clasicos.
+
+La segunda estrategia que utiliza el paquete *chopepi* es generar el
+particionado de las escalas temporales sobre una lista de vectores de
+igual tamaño que el número de episodios a procesar. Esta estrategia
+por un lado mejora significativamente la velocidad de particionado
+uni-escal y además, en caso de tener que trabajar con particionados en
+multiples escalas reduce la complejidad del problema, ya que el número de
+episodios a procesar  no crece multiplicativamente, si no solo
+linealmente con la inclusión de nuevas escalas. 
+  
+El objetivo final del particionado uni o multi-escala es construir una
+nueva tabla de sub-episodios cuyo tamaño sera el resultado de
+multiplicar el tamaño de la tabla original por el número de medio
+sub-episodios que cada escala de partición genera, tal como se ha
+mostrado anteriormente la tabla "[[tbl:Split.age.period][Split by age and period]]". El paquete
+*choopepi* divide el proceso de particionado en varios sub-procesos
+intermedios que realizan cuatro funciones: /choop()/, /combine2()/,
+/meltEpi()/ y /addCXst()/ y cuyos resultados intermedios se procesan
+sucesivamente hasta obtener el resultado buscado.
+
+Dado que una de las partes mas más costosos en memoria y tiempo de
+proceso es la generación de multiples registros de subepisodios por
+cada uno de los episodios originales partida, y su coste crece mas que
+linealmente cuando aumenta el número de episodios, no es recomendable
+obtener particionados multiescala a partir de la aplicación sucesivas,
+de funciones del tipo /survSplit()/. Resulta menos oneroso en memoria
+y tiempo de proceso realizar particiones unidimensionales
+independientes de cada escala temporal para combinarlas
+posteriormente. Este es una de las estrategia de optimización que usa
+*chopepi* usar una combinación de funciones, en lugar de una única
+función para conseguir su particionado.  La más importante de estas
+funciones es *chop()*, la cual realiza un pre-particionado en una
+escala subdivisión de la duración cada episodio sobre un vector con la
+sucesión de tiempos de ocupación en cada categoría discreta de la
+escala que estemos procesando (grupos de edad, años calendario ..), la
+cual se almacenará en forma de lista de vectores en una columna una
+tabla auxiliar con los resultados intermedios de la
+pre-particionada. A modo de ejemplo, un pre-particionar en la escala
+de edad de la [[tbl:original][tabla de episodios original]] produciría este resultado
+intermedio:
+
+#+CAPTION: Chop: duration by age
+#+NAME:   tbl:Chop.age
+| kid |    age | durations.age   |
+|-----+--------+-----------------|
+|  <> |     <> | <>              |
+| 101 |  0.000 | c(15, 5, 3.169) |
+| 102 | 23.169 | c(1.831, 1.804) |
+| 201 |  0.000 | c(15, 5, 1.079) |
+| 202 | 21.079 | c(3.921, 0.887) |
+| 203 | 25.887 | 3.591           |
+| 301 |  0.000 | c(15, 3.997)    |
+| 302 | 18.997 | c(1.003, 4.838) |
+
+Esta tabla intermedia de episodios preparticionado se puede convertir
+en una tabla de sub-episodios individuales, por medio de dos funciones
+/chopepi::meltEpi/ y /chopepi::addCXst/, que aplicadas secuencialmente
+producen una tabla, donde cada sub-episodios es una fila, tal como se
+muestra en la tabla anterior [[tbl:Chop.age]["Split by age"]]. Esta tabla podría volver
+a sub-particionar aplicando de nuevo /chop()/ sobre otra escala
+temporal. Pero, como se ha comentado, para obtener un particionado en
+múltiples escala, esta estrategia no es eficiente, ya que el primer
+particionado multiplica los episodios originales por el número de
+particiones por episodio de la segunda escala de tiempo empleada, lo
+que puede incrementar su número lo suficiente para reducir
+significativamente el rendimiento del segundo particionado. Resulta
+más adecuado pre-particionar con /chop()/ los episodios originales
+sobre todas las escalas temporales a estudiar y tras ello combinar
+estos en una nueva pre-partición multi-escala, a partir de la que
+derivar posteriomente la tabla de subepisodios definitiva. Con esta
+estrategia la complejidad del proceso crece linealmente por cada nueva
+partición agregada en lugar de hacerlo multiplicativamete sin
+aplicáramos el particionado secuencial.
+
+Por ejemplo para conseguir una particionado múltiple en la escala edad
+y calendario, aplicaremos /chop()/ de nuevo sobre los episodios
+originales para obtener este 2º preparticionado:
+
+#+CAPTION: Chop: duration by period
+#+NAME:   tbl:Chop.period
+| kid |   period | durations.period    |
+|-----+----------+---------------------|
+| 101 | 1958.194 | c(16.806, 5, 1.363) |
+| 102 | 1981.364 | 3.634               |
+| 201 | 1955.520 | c(19.48, 1.599)     |
+| 202 | 1976.598 | c(3.402, 1.405)     |
+| 203 | 1981.408 | 3.590               |
+| 301 | 1960.161 | c(14.839, 4.158)    |
+| 302 | 1979.158 | c(0.842, 4.999)     |
+
+Para a continuación obtener el particionado en las dos escala de
+tiempo combinamos los dos particionados unidimensionales en un nuevo
+particionado multidimensional usando la función /combine2c/ sobre las
+tablas pre-particionadas: "[[tbl:Chop.age][by age]]" y "[[tbl:Chop.period][by period]]", lo que producirá
+el siguiente  resultado:
+
+#+CAPTION: Chop: duration by age and period
+#+NAME:   tbl:Chop.age.period
+| kid |    age |   period | durations.age.period      |
+|-----+--------+----------+---------------------------|
+| 101 |  0.000 | 1958.194 | c(15, 1.8, 3.2, 1.8, 1.4) |
+| 102 | 23.169 | 1981.364 | c(1.831, 1.8)             |
+| 201 |  0.000 | 1955.520 | c(15, 4.5, 0.5, 1.1)      |
+| 202 | 21.079 | 1976.598 | c(3.402, 0.5, 0.9)        |
+| 203 | 25.887 | 1981.408 | 3.599                     |
+| 301 |  0.000 | 1960.161 | c(14.839, 0.199, 4)       |
+| 302 | 18.997 | 1979.158 | c(0.842, 0.2, 4.8)        |
+
+A partir de esta tabla de pre-particionado multidimensional, mediante
+la posterior aplicación de las funciones /meltEpi()/ y /addCXst()/ se
+optiene una tabla con registros individuales por cada sub-episodios,
+como la mostrada individuales "[[tbl:Split.age.period][Split by age and period]]" mostrada
+anteriormente y que representa el objetivo finalmente buscado.
+
+* Código de ejemplo de particionado multiples con /chopepi/
+
+A continuación mostramos el código de R que se ha empleado para
+generar el ejemplo mostrado en el apartado anterior.
+
+#+begin_src R
+require(knitr)
+require(data.table)
+require(chopepi)
+
+### Crea tabla fuentes para ejemplo
+###
+data.table(ikey=c(1L,1L,2L,2L,2L,3L,3L),
+           seq.epi=c(1L,2L,1L,2L,3L,1L,2L),
+           date.entry=as.Date(c("1958/03/13","1981/05/14","1955/07/10",
+                               "1976/08/07","1981/05/30",
+                               "1960/02/29","1979/02/28"),"%Y/%m/%d"),
+           Cst.par=c(0L,1L,0L,1L,2L,0L,1L),
+           Xst.par=c(1L,1L,1L,2L,3L,1L,1L)
+           )-> epi.raw
+
+end.tracking <-  as.Date(c("1985/01/01"), "%Y/%m/%d")
+
+epi.raw[,':='(span.days  = as.integer(c(date.entry[-1],end.tracking) - date.entry),
+           span.years = cal.age2(date.entry,c(date.entry[-1],end.tracking) ),
+           age.entry  = cal.age2(date.entry[1],date.entry))
+        ,ikey]
+
+epi.raw[, ':='(kepi=ikey*100L+seq.epi,year.entry=  cal.yr2(date.entry)) ]
+
+epi.raw[,c(1:2,9,3,10,8,7,6,4:5)]  -> epi.raw
+
+
+
+## particiona por  edad ##############################
+chop(start.times =  age.entry,
+     durations = span.years,
+     breaks =  c(0,seq(15,100,by=5)),
+     kid    = kepi,
+     timedim = 'age',
+     data = epi.raw) -> cepi.age
+
+meltEpi(cepi.age) -> epi.chop.age
+
+addCXst(epi.chop.age,epi.raw, Cst = 'Cst.par',
+        Xst = 'Xst.par', id.original = 'kepi') -> epi.chop.age
+
+epi.chop.age[,sum(duration)] - epi.raw[,sum(span.days/365.25)] 
+
+## particiona por periodo ##############################
+chop(start.times =  year.entry,
+     durations = span.years,
+     breaks =  c(1950,seq(1975,1990,by=5)),
+     kid    = kepi,
+     timedim = 'period',
+     data = epi.raw) -> cepi.period
+
+meltEpi(cepi.period) -> epi.chop.period
+
+addCXst(epi.chop.period,epi.raw, Cst = 'Cst.par',
+        Xst = 'Xst.par', id.original = 'kepi') -> epi.chop.period
+
+epi.chop.period[,sum(duration)] - epi.raw[,sum(span.days/365.25)]  
+
+## combina particionado de edad y periodo.
+
+combine2c(cepi.age, cepi.period, dec.precision = 1) ->  cepi.age.period
+
+
+meltEpi(cepi.age.period) -> epi.chop.age.period
+
+addCXst(epi.chop.age.period,epi.raw, Cst = 'Cst.par',
+        Xst = 'Xst.par', id.original = 'kepi') -> epi.chop.age.period
+
+epi.chop.age.period[,sum(duration)] - epi.raw[,sum(span.days/365.25)]  
+
+## Muestra resultados:
+
+knitr::kable(epi.raw)
+knitr::kable(epi.chop.age)
+knitr::kable(epi.chop.period)
+knitr::kable(epi.chop.age.period)
+
+knitr::kable(cepi.age)
+knitr::kable(cepi.period)
+knitr::kable(cepi.age.period)
+
+#+end_src
+
+
+
+

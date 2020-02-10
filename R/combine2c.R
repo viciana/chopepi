@@ -20,28 +20,34 @@
 #' @export
 #'
 #' @return data,table con los registros inteseccion de las tabla de episodios y
-#'         y una nueva variable \emph{duration.#...} con la intesercion de los
+#'         y una nueva variable \emph{durations.#...} con la intesercion de los
 #'         subepisodios en cada una de las dos escala temporales de los
 #'         ficheros fuentes.
 #'
 #' @examples
 #' \donttest{
-#' ## Trocea una tabla de episodios en 3 escalas termporales distintas
-#'   start.times <- c(16,21,32)
-#'   durations <- c(12.5,19.4, 7.3)      ; breaks <- seq(10,50, by=5)
-#'   start.times2 <- c(1997,2005.2,2007) ; breaks2 <- seq(1990,2020, by=5)
-#'   start.times3 <- c(3.2,4,2.3)        ; breaks3 <- seq(0,25, by=5)
+#' epi.original <- data.table::data.table(
+#'  kid = 1:3 ,
+#'  start.times1  = c(16,21,32)     ,
+#'  durations  = c(12.5,19.4, 7.3) ,
+#'  start.times2 = c(1997,2005.2,2007),
+#'  Cst = c(0,0,0),
+#'  Xst = c(1,1,1)
+#'  )
 #'
-#'   chop (start.times,  durations,  breaks,   timedim = 'edad' )   -> epi.seq1
-#'   chop (start.times2, durations,  breaks2 , timedim = 'periodo') -> epi.seq2
-#'   chop (start.times3, durations,  breaks3 , timedim = 'duraMat') -> epi.seq3
+#' chop (start.times =  start.times1,
+#'      durations   = durations,
+#'      breaks = seq(10,50, by=5),
+#'      timedim = 'edad', data = epi.original)  -> epi.seq1
 #'
-#' ## Combina las tres escalas en dos pasos ...
-#'   combine2c (epi.seq1,epi.seq2) -> epi.1y2
-#'   names ( attributes(epi.1y2) )
-#'   combine2c (epi.1y2,epi.seq3) -> epi.1y2y3
-#'   names ( attributes(epi.1y2y3) )
-#'   epi.1y2y3
+#' chop (start.times = start.times2,
+#'      durations    = durations,
+#'      breaks       = seq(10,50, by=5),
+#'      timedim      = 'edad', data = epi.original)  -> epi.seq2
+#'
+#' combine2c (epi.seq1,epi.seq2, dec.precision = 2) -> epi.1y2
+#' names (epi.1y2)
+#'
 #' }
 combine2c <- function(epi.seq1,epi.seq2, dec.precision=3) {
   data.table::merge.data.table(epi.seq1,epi.seq2,by='kid') -> kk
@@ -51,7 +57,8 @@ combine2c <- function(epi.seq1,epi.seq2, dec.precision=3) {
   t2 <- strsplit(xt2,'durations\\.')[[1]][2]
   new.comb<-paste0('durations.',t1,'.',t2)
 
-  kk [,c(new.comb):= mapply( function(x,y) {  c( min(c(x[1],y[1])) ,
+  kk [,c(new.comb):= mapply( function(x,y) {
+    c( min(c(x[1],y[1])) ,
                                                     diff(sort ( union(round(cumsum(x),dec.precision),
                                                                       round(cumsum(y),dec.precision) ))))},
                                 get(xt1),get(xt2))   ]

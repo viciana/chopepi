@@ -37,26 +37,24 @@ Cada fila de id.original es un episodios con estados constante =
 }
 \examples{
 \donttest{
-    start.times <- c(16,21,32) ;  durations <- c(12.5,19.4, 7.3) ;  breaks <- seq(10,50, by=5)
-    start.times2 <- c(1997,2005.2,2007) ;                           breaks2 <- seq(1990,2020, by=5)
-    DT <- data.table::data.table(id = 1:length(start.times),
-                start.times=start.times,
-                start.times2=start.times2,
-                durations = durations,
-                st.start=c(1L,2L,1L),
-                st.end=c(3L,2L,3L)
-                )
+epi.original <- data.table::data.table(
+ kid = 1:3 ,
+ start.times  = c(16,21,32)     ,
+ durations  = c(12.5,19.4, 7.3) ,
+ Cst = c(0,0,0),
+ Xst = c(1,1,1)
+ )
 
-   rm(start.times,start.times2,durations)
-   chop (start.times,  durations, breaks , timedim = 'edad'   , kid=id, data = DT) -> epi.seq1
-   chop (start.times2, durations, breaks2, timedim = 'periodo', kid=id, data = DT) -> epi.seq2
-   combine2c (epi.seq1,epi.seq2) -> epi.1y2
-   meltEpi(epi.1y2) -> epi.melt
-   head (epi.melt)
-  addCXst (epi.melt =  epi.melt,
-          epi.original = DT,
-          Cst= 'st.start',  Xst='st.end',
-          id.original = 'id') -> epi.melt.CXst
-  head(epi.melt.CXst)
+chop (start.times =  start.times,
+     durations   = durations,
+     breaks = seq(10,50, by=5),
+     timedim = 'edad', data = epi.original)  -> epi.seq
+
+meltEpi(epi.seq) -> epi.sub
+
+addCXst(epi.sub, epi.original,
+          Cst= 'Cst',  Xst='Xst',
+          id.original = 'kid') -> epi.sub2
+epi.sub2
   }
 }

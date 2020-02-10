@@ -43,7 +43,7 @@
 #'     origina segun la regla dada por los puntos de corte. El
 #'     attributo breaks.<dimension> contiene la regla utilizada
 #'
-#' @exportt
+#' @export
 #'
 #' @examples
 #' \donttest{
@@ -86,7 +86,7 @@ chop <- function (start.times, durations,  breaks,
   DDTT[,inicio:=sapply(inicio, function (e) e)]  # cambia lista a vector
   attr(DDTT,paste0("breaks.",timedim)) <- breaks
   data.table::setnames(DDTT, 1:2,c(timedim,paste0('durations.',timedim)))
-  return(DDTT)
+  return(DDTT[,c(3,1:2)])
 }
 
 
